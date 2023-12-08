@@ -1,0 +1,8 @@
+# ninja log v5
+1	340	7237504946778328	CMakeFiles/Simple_Garbage_Collector.dir/main.c.obj	c903924ecbb2609
+4	342	7237504946788308	CMakeFiles/Simple_Garbage_Collector.dir/gc/gc.c.obj	ad0bec6f0d9e1dc1
+342	527	7237504948610213	Simple_Garbage_Collector.exe	a86fee6914c45024
+2	67	7237506226988971	CMakeFiles/Simple_Garbage_Collector.dir/main.c.obj	c903924ecbb2609
+67	149	7237506227786842	Simple_Garbage_Collector.exe	a86fee6914c45024
+2	67	7237507591453601	CMakeFiles/Simple_Garbage_Collector.dir/main.c.obj	c903924ecbb2609
+67	145	7237507592212877	Simple_Garbage_Collector.exe	a86fee6914c45024
