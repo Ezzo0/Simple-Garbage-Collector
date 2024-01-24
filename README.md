@@ -1,12 +1,12 @@
 # Simple Garbage Collector using my Own Malloc
 
-First we are going to talk about malloc, then the garbage collector using mark and sweep. So, let's dive into the realm of memory.
+First we are going to talk about malloc, then the garbage collector using mark and sweep. So, get a deep breath cause we will dive into the realm of memory.
 
 ## My Malloc
 
 Setting aside initial considerations, the function signature of malloc is as follows: `void *malloc(size_t size);`
 This function requires a specified number of bytes as input and provides a pointer to a memory block of that particular size as output.
-There are a number of ways we can implement this. We're going to arbitrarily choose to use sbrk. The OS reserves stack and heap space for processes and sbrk lets us manipulate the heap.
+There are a number of ways we can implement this. We're going to arbitrarily choose to use [sbrk](https://man7.org/linux/man-pages/man2/sbrk.2.html). The OS reserves stack and heap space for processes and sbrk lets us manipulate the heap.
 `sbrk(0)` returns a pointer to the current top of the heap, while `sbrk(x)` increments the heap size by x and returns a pointer to the previous top of the heap.
 
 ![memory_layout](https://open4tech.com/wp-content/uploads/2017/04/Memory_Layout.jpg)
@@ -179,3 +179,209 @@ void my_free(void *ptr)
 ```
 
 Since free shouldn't be called on arbitrary addresses or on blocks that are already freed, we can assert that those things never happen.
+
+## Garbage Collector
+
+Garbage collection is considered one of the more shark-infested waters of programming, but in about two hundered lines of C I managed to whip up a basic [mark-and-sweep](https://en.wikipedia.org/wiki/Tracing_garbage_collection#Na%C3%AFve_mark-and-sweep) collector.
+
+[Various methods](https://en.wikipedia.org/wiki/Tracing_garbage_collection) exist for implementing the procedure of identifying and recovering all unused objects.
+However, the most basic and earliest algorithm devised for this purpose is known as "mark-sweep."
+The algorithm works almost exactly like our definition of reachability:
+1.Starting at the roots, traverse the entire object graph. Every time you reach an object, set a “mark” bit on it to true.
+2.Once that’s done, find all of the objects whose mark bits are not set and delete them.
+
+### A pair of objects
+
+Before delving into the implementation of those two stages, let's address a few initial considerations. We won't be developing an interpreter for a language, complete with a parser, bytecode, or any similar complexities, but we do require a basic amount of code to generate some garbage that we can subsequently collect.
+Let’s pretend that we’re writing an interpreter for a little language. It’s dynamically typed, and has two types of objects: ints and pairs. Here’s an enum to identify an object’s type:
+
+```
+typedef enum
+{
+    INT_TYPE,
+    PAIR_TYPE
+} obj_type;
+```
+
+A pair can encompass various combinations, such as two integers, an integer paired with another pair, or any other combinations. Surprisingly, a considerable range of possibilities can be explored using this simple concept.Since an object in the VM can be either of these, the best way in C to implement it is with a [tagged union](https://blog.ryanmartin.me/tagged-unions). We define it thusly:
+
+```
+typedef struct object
+{
+    obj_type type;
+    uint8_t marked;
+    /* The next object in the list of all objects. */
+    struct object *next;
+
+    union
+    {
+        int val;
+        struct
+        {
+            struct object *left;
+            struct object *right;
+        };
+    };
+} object_t;
+```
+
+The main Object struct has a type field that identifies what kind of value it is—either an int or a pair. Then it has a union to hold the data for the int or pair.
+
+### A minimal virtual machine
+
+Now we can employ this data type within a small virtual machine. In this narrative, the virtual machine's function is to maintain a stack that holds the variables currently in scope. Many language virtual machines follow a stack-based architecture, similar to the JVM.We model that explicitly and simply like so:
+
+```
+typedef struct
+{
+    object_t *STACK[STACK_MAX_SIZE];
+    /* The first object in the list of all objects. */
+    object_t *first_obj;
+    int stack_size;
+
+    /* The total number of currently allocated objects. */
+    int numObjects;
+
+    /* The number of objects required to trigger a GC. */
+    int maxObjects;
+} VM;
+```
+
+Now that we’ve got our basic data structures in place. First, let’s write a function that creates and initializes a VM:
+
+```
+VM *newVM()
+{
+    VM *vm = (VM *)my_malloc(sizeof(VM));
+    vm->stack_size = 0;
+    vm->first_obj = NULL;
+    vm->numObjects = 0;
+    vm->maxObjects = INIT_OBJ_NUM_MAX;
+    return vm;
+}
+```
+
+Once we have a VM, we need to be able to manipulate its stack:
+
+```
+void push(VM *vm, object_t *obj)
+{
+    assertion(vm->stack_size < STACK_MAX_SIZE, "STACK OVERFLOW");
+    vm->STACK[vm->stack_size++] = obj;
+}
+
+object_t *pop(VM *vm)
+{
+    assertion(vm->stack_size > 0, "STACK UNDERFLOW");
+    return vm->STACK[--vm->stack_size];
+}
+```
+
+Now, we need to be able to create objects:
+
+```
+object_t *newObject(VM *vm, obj_type typ)
+{
+    if (vm->numObjects == vm->maxObjects)
+        gc(vm);
+
+    object_t *obj = my_malloc(sizeof(object_t));
+    obj->type = typ;
+    obj->marked = 0;
+
+    /* Insert it into the list of allocated objects. */
+    obj->next = vm->first_obj;
+    vm->first_obj = obj;
+
+    vm->numObjects++;
+
+    return obj;
+}
+```
+
+Using that, we can write functions to push each kind of object onto the VM’s stack:
+
+```
+void pushInt(VM *vm, int val)
+{
+    object_t *obj = newObject(vm, INT_TYPE);
+    obj->val = val;
+    push(vm, obj);
+}
+
+object_t *pushPair(VM *vm)
+{
+    object_t *obj = newObject(vm, PAIR_TYPE);
+    obj->left = pop(vm);
+    obj->right = pop(vm);
+    push(vm, obj);
+    return obj;
+}
+```
+
+And that’s it for our little VM. If we had infinite memory, it would even be able to run real programs. Since we don’t, let’s start collecting some garbage.
+
+### Marking Phase
+
+In this stage, We need to walk all of the reachable objects and set their mark bit. When we create a new object, we initialize marked to zero.
+To mark all of the reachable objects, we start with the variables that are in memory. That looks like this:
+
+```
+void markAll(VM *vm)
+{
+    for (int i = 0; i < vm->stack_size; ++i)
+        mark(vm->STACK[i]);
+}
+```
+
+### Sweeping Phase
+
+The next phase is to sweep through all of the objects we’ve allocated and free any of them that aren’t marked. But there’s a problem here: all of the unmarked objects are unreachable! The VM has implemented the language’s semantics for object references, so we’re only storing pointers to objects in variables and the pair fields. As soon as an object is no longer pointed to by one of those, the VM has lost it entirely and actually leaked memory. Our trick to solve this is that the VM can have its own references to objects that are distinct from the semantics that are visible to the language user.
+The simplest way to do this is to just maintain a linked list of every object we’ve ever allocated. This is implemented in `object_t` structure as: `struct sObject* next;`. Also, the VM keeps track of the head of that list, which is implemented in `VM` as: `Object* firstObject;`.
+
+In newVM() we make sure to initialize firstObject to NULL. Whenever we create an object, we add it to the list:
+
+```
+object_t *newObject(VM *vm, obj_type typ)
+{
+  /* Previous stuff... */
+  /* Insert it into the list of allocated objects. */
+  object->next = vm->firstObject;
+  vm->firstObject = object;
+}
+```
+
+This way, even if the language can’t find an object, the language implementation still can.
+
+To sweep through and delete the unmarked objects, we traverse the list:
+
+```
+void sweep(VM *vm)
+{
+    object_t **obj = &vm->first_obj;
+    while (*obj)
+    {
+        if (!(*obj)->marked)
+        {
+            /* This object wasn't reached, so remove it from the list
+            and free it. */
+            object_t *garbage = *obj;
+            *obj = garbage->next;
+            my_free(garbage);
+            vm->numObjects--;
+        }
+        else
+        {
+            /* This object was reached, so unmark it (for the next GC)
+            and move on to the next. */
+            (*obj)->marked = 0;
+            obj = &(*obj)->next;
+        }
+    }
+}
+```
+
+Code just walks the entire linked list. Whenever it hits an object that isn’t marked, it frees its memory and removes it from the list. When this is done, we will have deleted every unreachable object.
+Now, we have our own garbage collector.
+
+This is the deepest part of my shark-infested waters; you may go to shore, diver.

@@ -27,7 +27,7 @@ void assertion(int condition, const char *message)
 
 VM *newVM()
 {
-    VM *vm = (VM *)malloc(sizeof(VM));
+    VM *vm = (VM *)my_malloc(sizeof(VM));
     vm->stack_size = 0;
     vm->first_obj = NULL;
     vm->numObjects = 0;
@@ -35,15 +35,16 @@ VM *newVM()
     return vm;
 }
 
-object_t *newObject(VM* vm, obj_type typ)
+object_t *newObject(VM *vm, obj_type typ)
 {
     if (vm->numObjects == vm->maxObjects)
         gc(vm);
 
-    object_t *obj = malloc(sizeof(object_t));
+    object_t *obj = my_malloc(sizeof(object_t));
     obj->type = typ;
     obj->marked = 0;
 
+    /* Insert it into the list of allocated objects. */
     obj->next = vm->first_obj;
     vm->first_obj = obj;
 
@@ -64,62 +65,68 @@ object_t *pop(VM *vm)
     return vm->STACK[--vm->stack_size];
 }
 
-void pushInt(VM* vm, int val)
+void pushInt(VM *vm, int val)
 {
-    object_t *obj = newObject(vm,INT_TYPE);
+    object_t *obj = newObject(vm, INT_TYPE);
     obj->val = val;
-    push(vm,obj);
+    push(vm, obj);
 }
 
-object_t *pushPair(VM* vm)
+object_t *pushPair(VM *vm)
 {
-    object_t *obj = newObject(vm,PAIR_TYPE);
-    obj->left  = pop(vm);
+    object_t *obj = newObject(vm, PAIR_TYPE);
+    obj->left = pop(vm);
     obj->right = pop(vm);
-    push(vm,obj);
+    push(vm, obj);
     return obj;
 }
 
 void mark(object_t *obj)
 {
-    if(!obj || obj->marked)
+    /* If already marked, we're done. Check this first
+     to avoid recursing on cycles in the object graph. */
+    if (!obj || obj->marked)
         return;
 
     obj->marked = 1;
-    if(obj->type == PAIR_TYPE)
+    if (obj->type == PAIR_TYPE)
     {
         mark(obj->left);
         mark(obj->right);
     }
 }
 
-void markAll(VM* vm)
+void markAll(VM *vm)
 {
     for (int i = 0; i < vm->stack_size; ++i)
         mark(vm->STACK[i]);
 }
 
-void sweep(VM* vm)
+void sweep(VM *vm)
 {
     object_t **obj = &vm->first_obj;
     while (*obj)
     {
-        if(!(*obj)->marked)
+        if (!(*obj)->marked)
         {
+            /* This object wasn't reached, so remove it from the list
+            and free it. */
             object_t *garbage = *obj;
             *obj = garbage->next;
-            free(garbage);
+            my_free(garbage);
             vm->numObjects--;
         }
         else
         {
+            /* This object was reached, so unmark it (for the next GC)
+            and move on to the next. */
             (*obj)->marked = 0;
             obj = &(*obj)->next;
         }
     }
 }
 
-void gc(VM* vm)
+void gc(VM *vm)
 {
     int numObjects = vm->numObjects;
 
@@ -135,22 +142,22 @@ void print_obj(object_t *obj)
 {
     switch (obj->type)
     {
-        case INT_TYPE:
-            printf("%d", obj->val);
-            break;
+    case INT_TYPE:
+        printf("%d", obj->val);
+        break;
 
-        case PAIR_TYPE:
-            printf("(");
-            print_obj(obj->left);
-            printf(", ");
-            print_obj(obj->right);
-            printf(")");
-            break;
+    case PAIR_TYPE:
+        printf("(");
+        print_obj(obj->left);
+        printf(", ");
+        print_obj(obj->right);
+        printf(")");
+        break;
     }
 }
 void freeVM(VM *vm)
 {
     vm->stack_size = 0;
     gc(vm);
-    free(vm);
+    my_free(vm);
 }

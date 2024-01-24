@@ -7,9 +7,6 @@
 
 /******************** Includes ********************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdlib.h>
 #include "../my_malloc/my_malloc.h"
 
 /******************** Macro Declarations ********************/
@@ -17,8 +14,6 @@
 #define STACK_MAX_SIZE 256
 
 /******************** Data Types Declarations ********************/
-
-typedef unsigned char uint8_t;
 
 typedef enum
 {
@@ -30,7 +25,7 @@ typedef struct object
 {
     obj_type type;
     uint8_t marked;
-
+    /* The next object in the list of all objects. */
     struct object *next;
 
     union
@@ -47,6 +42,7 @@ typedef struct object
 typedef struct
 {
     object_t *STACK[STACK_MAX_SIZE];
+    /* The first object in the list of all objects. */
     object_t *first_obj;
     int stack_size;
 
