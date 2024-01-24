@@ -1,6 +1,6 @@
 # Simple Garbage Collector using my Own Malloc
 
-First we are going to talk about malloc, then the garbage collector using mark and sweep. So, get a deep breath cause we will dive into the realm of memory.
+First we are going to talk about malloc, then the garbage collector using mark and sweep. So, get a deep breath because we will dive into the realm of memory.
 
 ## My Malloc
 
