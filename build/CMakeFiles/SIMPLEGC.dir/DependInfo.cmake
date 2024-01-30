@@ -8,9 +8,9 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "E:/Studying/Projects/simple_garbage_collector/gc/gc.c" "CMakeFiles/SIMPLEGC.dir/gc/gc.c.obj" "gcc" "CMakeFiles/SIMPLEGC.dir/gc/gc.c.obj.d"
-  "E:/Studying/Projects/simple_garbage_collector/main.c" "CMakeFiles/SIMPLEGC.dir/main.c.obj" "gcc" "CMakeFiles/SIMPLEGC.dir/main.c.obj.d"
-  "E:/Studying/Projects/simple_garbage_collector/my_malloc/my_malloc.c" "CMakeFiles/SIMPLEGC.dir/my_malloc/my_malloc.c.obj" "gcc" "CMakeFiles/SIMPLEGC.dir/my_malloc/my_malloc.c.obj.d"
+  "/home/abdelrahman/Downloads/sgc/Simple-Garbage-Collector/gc/gc.c" "CMakeFiles/SIMPLEGC.dir/gc/gc.c.o" "gcc" "CMakeFiles/SIMPLEGC.dir/gc/gc.c.o.d"
+  "/home/abdelrahman/Downloads/sgc/Simple-Garbage-Collector/main.c" "CMakeFiles/SIMPLEGC.dir/main.c.o" "gcc" "CMakeFiles/SIMPLEGC.dir/main.c.o.d"
+  "/home/abdelrahman/Downloads/sgc/Simple-Garbage-Collector/my_malloc/my_malloc.c" "CMakeFiles/SIMPLEGC.dir/my_malloc/my_malloc.c.o" "gcc" "CMakeFiles/SIMPLEGC.dir/my_malloc/my_malloc.c.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.
